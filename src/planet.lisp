@@ -4,11 +4,13 @@
   (:use :cl :iter)
   (:export :make-atom-feed
            :make-rss-2.0-feed
+           :load-feed-from-file
            :planet
            :defplanet
            :planet-load-all
            :planet-syndicate-feed
-           :planet-clear))
+           :planet-clear
+           ))
 
 (in-package :planet)
 
@@ -35,8 +37,6 @@
 (defun entry-published-universal (entry)
   (slot-value entry 'published))
 
-;;  (local-time:timestamp-to-universal (local-time:parse-timestring (slot-value entry 'published))))
-   
 (defclass feed ()
   ((author :initarg :author :initform nil :reader feed-author)
    (url :initarg :url :reader feed-url)
@@ -145,7 +145,20 @@
                       :self-href ,self-href
                       :schedule ,schedule
                       :feeds ,feeds))))
-     
+
+;;; load-feeds-from-file
+
+(defvar *feeds*)
+
+(defparameter *planet.reader.package*
+  (defpackage :planet..reader
+    (:use)))
+
+(defun load-feed-from-file (path)
+  (let ((*feeds* nil)
+        (*package* *planet.reader.package*))
+    (load path)
+    *feeds*))
 
 ;;; make-atom-feed
 
@@ -170,6 +183,12 @@
                                              "/atom:feed/atom:entry")
                  :parse-entry #'parse-atom-entry))
 
+(defmacro define-atom-feed (author-name author-href href &key category)
+  (push (make-atom-feed author-name author-href href :category category)
+        *feeds*))
+
+(import 'define-atom-feed *planet.reader.package*)
+
 ;;; make-rss-2.0-feed
 
 (defun parse-rss-item (node author)
@@ -192,4 +211,9 @@
                                              (format nil "/rss/channel/item[category = '~A']" category)
                                              "/rss/channel/item")
                  :parse-entry #'parse-rss-item))
+
+(defmacro define-rss-feed (author-name author-href href &key category)
+  (push (make-rss-2.0-feed author-name author-href href :category category)
+        *feeds*))
   
+(import 'define-rss-feed *planet.reader.package*)
