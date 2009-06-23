@@ -1,5 +1,8 @@
 /* planet.css */
 
+body {
+    font-family: "Helvetica Neue, Arial, sans-serif";
+}
 
 .entry {
     margin-bottom: 10px;
@@ -56,7 +59,7 @@
 
     padding-left: 15px;
 
-    color: #6a5eab
+    color: #6a5eab;
 }
 
 #syndicate {

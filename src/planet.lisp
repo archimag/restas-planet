@@ -4,12 +4,18 @@
   (:use :cl :iter)
   (:export :make-atom-feed
            :make-rss-2.0-feed
-           :load-feed-from-file
+           :load-feeds-from-file
            :planet
            :defplanet
+           :planet-feeds
            :planet-load-all
            :planet-syndicate-feed
            :planet-clear
+           :author
+           :author-name
+           :author-uri
+           :feed-author
+           :*feeds-ns-map*
            ))
 
 (in-package :planet)
@@ -42,23 +48,47 @@
    (url :initarg :url :reader feed-url)
    (find-entry-xpath-query :initarg :find-entry-xpath-query :reader feed-find-entry-xpath-query)
    (parse-entry :initarg :parse-entry :reader feed-parse-entry)))
+
+
+(defvar *feeds*)
+
+(defparameter *planet.reader.package*
+  (defpackage :planet..reader
+    (:use)))
+
+(defun load-feeds-from-file (path)
+  (let ((*feeds* nil)
+        (*package* *planet.reader.package*))
+    (load path)
+    *feeds*))
+
   
 (defclass planet ()
   ((name :initarg :name :initform "PLANET" :accessor planet-name)
    (alternate-href :initarg :alternate-href :initform nil :accessor planet-alternate-href)
    (self-href :initarg :self-href :initform nil :accessor planet-self-href)
    (id :initarg :id :initform nil :accessor planet-id)
-   (feeds :initarg :feeds :initform nil :accessor planet-feeds)
+   (feeds :initarg :feeds :initform nil)
    (syndicate-feed :initform nil :reader planet-syndicate-feed)
    (scheduler :initform nil)))
+
+(defgeneric planet-feeds (planet))
+
+(defmethod planet-feeds (planet)
+  (let ((feeds (slot-value planet 'feeds)))
+    (if (pathnamep feeds)
+        (load-feeds-from-file feeds)
+        feeds)))
 
 (defun planet-load-all (planet)
   "Load all feeds"
   (with-slots (syndicate-feed) planet
     (when syndicate-feed
-      (xtree:release syndicate-feed))
-    (let ((entries nil))
-      (iter (for feed in (planet-feeds planet))
+      (xtree:release syndicate-feed)
+      (setf syndicate-feed nil))
+    (let ((entries nil)
+          (feeds (planet-feeds planet)))
+      (iter (for feed in feeds)
             (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
               (iter (for rawentry in-xpath-result (feed-find-entry-xpath-query feed) on rawfeed with-ns-map *feeds-ns-map*)
                     (push (funcall (feed-parse-entry feed)
@@ -106,7 +136,7 @@
   (planet-stop-scheduler planet)
   (with-slots (scheduler) planet
       (setf scheduler
-            (clon:schedule-function '(lambda () (planet-load-all planet))
+            (clon:schedule-function #'(lambda () (planet-load-all planet))
                                     (clon:make-scheduler (clon:make-typed-cron-schedule :second second
                                                                                         :minute minute
                                                                                         :hour hour
@@ -127,38 +157,26 @@
 
 (defmethod initialize-instance ((planet planet) &key (schedule '(:hour *)) &allow-other-keys)
   (call-next-method)
+  (setf (slot-value planet 'syndicate-feed)
+        (xtree:parse "<feed xmlns=\"http://www.w3.org/2005/Atom\" />"))
   (when schedule
-    (funcall #'planet-reset-scheduler
-             (list* planet
-                    schedule)))
+    (apply #'planet-reset-scheduler 
+           planet
+           schedule))
   (tg:finalize planet #'planet-clear))
 
 (defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds)
+  (when (and (boundp planet-name)
+             (typep (symbol-value planet-name) 'planet))
+    (planet-clear (symbol-value planet-name)))
   `(progn
-     (when (and (boundp ',planet-name)
-                (typep ,planet-name 'planet))
-       (planet-clear ,planet-name))
      (defparameter ,planet-name
        (make-instance 'planet
                       :name ,name
                       :alternate-href ,alternate-href
                       :self-href ,self-href
-                      :schedule ,schedule
+                      :schedule ',schedule
                       :feeds ,feeds))))
-
-;;; load-feeds-from-file
-
-(defvar *feeds*)
-
-(defparameter *planet.reader.package*
-  (defpackage :planet..reader
-    (:use)))
-
-(defun load-feed-from-file (path)
-  (let ((*feeds* nil)
-        (*package* *planet.reader.package*))
-    (load path)
-    *feeds*))
 
 ;;; make-atom-feed
 
@@ -183,7 +201,7 @@
                                              "/atom:feed/atom:entry")
                  :parse-entry #'parse-atom-entry))
 
-(defmacro define-atom-feed (author-name author-href href &key category)
+(defun define-atom-feed (author-name author-href href &key category)
   (push (make-atom-feed author-name author-href href :category category)
         *feeds*))
 
@@ -212,7 +230,7 @@
                                              "/rss/channel/item")
                  :parse-entry #'parse-rss-item))
 
-(defmacro define-rss-feed (author-name author-href href &key category)
+(defun define-rss-feed (author-name author-href href &key category)
   (push (make-rss-2.0-feed author-name author-href href :category category)
         *feeds*))
   

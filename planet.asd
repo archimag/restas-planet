@@ -7,7 +7,7 @@
 
 
 (defsystem :planet
-  :depends-on (#:restas-new #:net-telent-date #:local-time #:clon #:trivial-garbage #:xfactory)
+  :depends-on (#:net-telent-date #:local-time #:clon #:trivial-garbage #:xfactory)
   :components
   ((:module :src
             :components

@@ -7,5 +7,5 @@
 
 (defsystem :planet-standalone
   :depends-on (#:planet #:restas-new)
-  :component ((:module :src
+  :components ((:module :src
                        :components ((:file "standalone")))))
