@@ -5,13 +5,6 @@
 
 (in-package :restas-planet-plugin)
 
-(defvar *planet-resources-dir* (merge-pathnames "resources/"
-                                                (asdf:component-pathname (asdf:find-system :planet))))
-
-
-;; ;;; atom.xml
-
-;;(define-simple-route
 
 ;; (defun atom.xml (route bindings)
 ;;   (declare (ignore route bindings))
