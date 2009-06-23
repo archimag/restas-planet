@@ -10,7 +10,7 @@
     :name "Sample PLANET implemented on Common Lisp"
     :alternate-href "http://lisp.catap.ru/planet/"
     :self-href "http://lisp.catap.ru/planet/atom.xml"
-    :feeds #P"/etc/planet-feeds.lisp")
+    :feeds-path #P"/etc/planet-feeds.lisp")
 
 (define-filesystem-route resources ":(file)" "resources/${file}")
 
@@ -42,7 +42,6 @@
                                                :title "Sample PLANET implemented on Common Lisp"
                                                :type "application/atom+xml")))
             (xhtml :body
-
                    (xhtml :div
                           (eid "planet-body")
                           (xhtml :div
@@ -57,51 +56,49 @@
                                         (xhtml :a
                                                (ehref "mailto:sample@sample.org")
                                                "Предложить блог"))
-                                 (xhtml :h3 "Авторы"
-                                        (xhtml :ul
-                                               (eid "authors")
-                                               (iter (for feed in (sort (planet-feeds *planet*)
-                                                                        #'string<
-                                                                        :key #'(lambda (f)
-                                                                                 (author-name (feed-author f)))))
-                                                     (xhtml :li
-                                                            (xhtml :a
-                                                                   (ehref (author-uri (feed-author feed)))
-                                                                   (xfactory:text (author-name (feed-author feed))))))))))
-                   (xhtml :div
-                          (eid "planet-content")
-                          (iter (for entry in-child-nodes (xtree:root (planet-syndicate-feed *planet*)) with (:local-name "entry"))
-                                (xhtml :div
-                                       (eclass "entry")
-                                       (xhtml :div
-                                              (eclass "entry-title")
-                                              (xhtml :a
-                                                     (ehref (xpath:find-string entry
-                                                                               "atom:link/@href"
-                                                                               :ns-map *feeds-ns-map*))
-                                                     (xfactory:text (xpath:find-string entry
-                                                                                       "atom:title"
-                                                                                       :ns-map *feeds-ns-map*)))
-                                              (xhtml :div
-                                                     (eclass "entry-author-info")
-                                                     (xhtml :strong "Источинк: ")
+                                 (xhtml :h3 "Авторы")
+                                 (xhtml :ul
+                                        (eid "authors")
+                                        (iter (for feed in (sort (planet-feeds *planet*)
+                                                                 #'string<
+                                                                 :key #'(lambda (f)
+                                                                          (author-name (feed-author f)))))
+                                              (xhtml :li
                                                      (xhtml :a
-                                                     (ehref (xpath:find-string entry
-                                                                               "atom:author/atom:uri"
-                                                                               :ns-map *feeds-ns-map*))
-                                                     (xfactory:text (xpath:find-string entry
-                                                                                       "atom:author/atom:name"
-                                                                                       :ns-map *feeds-ns-map*)))))
+                                                            (ehref (author-uri (feed-author feed)))
+                                                            (xfactory:text (author-name (feed-author feed))))))))
+                          (xhtml :div
+                                 (eid "planet-content")
+                                 (iter (for entry in-child-nodes (xtree:root (planet-syndicate-feed *planet*)) with (:local-name "entry"))
                                        (xhtml :div
-                                              (eclass "entry-content")
-                                              (html:with-parse-html (doc (xpath:find-string entry
-                                                                                            "atom:content"
-                                                                                            :ns-map *feeds-ns-map*))
-                                                (iter (for node in-child-nodes (or (xpath:find-single-node (xtree:root doc) "body")
-                                                                                   (xtree:root doc)))
-                                                      (xtree:append-child xfactory::*node* (xtree:copy node)))))
-                                       )))
-                   )))))
+                                              (eclass "entry")
+                                              (xhtml :div
+                                                     (eclass "entry-title")
+                                                     (xhtml :a
+                                                            (ehref (xpath:find-string entry
+                                                                                      "atom:link/@href"
+                                                                                      :ns-map *feeds-ns-map*))
+                                                            (xfactory:text (xpath:find-string entry
+                                                                                              "atom:title"
+                                                                                              :ns-map *feeds-ns-map*)))
+                                                     (xhtml :div
+                                                            (eclass "entry-author-info")
+                                                            (xhtml :strong "Источинк: ")
+                                                            (xhtml :a
+                                                                   (ehref (xpath:find-string entry
+                                                                                             "atom:author/atom:uri"
+                                                                                             :ns-map *feeds-ns-map*))
+                                                                   (xfactory:text (xpath:find-string entry
+                                                                                                     "atom:author/atom:name"
+                                                                                                     :ns-map *feeds-ns-map*)))))
+                                              (xhtml :div
+                                                     (eclass "entry-content")
+                                                     (html:with-parse-html (doc (xpath:find-string entry
+                                                                                                   "atom:content"
+                                                                                                   :ns-map *feeds-ns-map*))
+                                                       (iter (for node in-child-nodes (or (xpath:find-single-node (xtree:root doc) "body")
+                                                                                          (xtree:root doc)))
+                                                             (xtree:append-child xfactory::*node* (xtree:copy node))))))))))))))
 
 (restas:start-web-server)
 (restas:reconnect-all-plugins) 

@@ -46,39 +46,112 @@
 (defclass feed ()
   ((author :initarg :author :initform nil :reader feed-author)
    (url :initarg :url :reader feed-url)
-   (find-entry-xpath-query :initarg :find-entry-xpath-query :reader feed-find-entry-xpath-query)
-   (parse-entry :initarg :parse-entry :reader feed-parse-entry)))
+   (category :initarg :category :initform nil :reader feed-category)))
 
+(defgeneric find-feed-entities (feed rawfeed))
+(defgeneric parse-feed-entry (feed rawentry))
+
+(defclass atom-feed (feed) ())
+
+(defmethod find-feed-entities ((feed atom-feed) rawfeed)
+  (xpath:eval-expression rawfeed
+                         (with-slots (category) feed
+                           (if category
+                               (format nil "/atom:feed/atom:entry[atom:category/@term='~A']" category)
+                               "/atom:feed/atom:entry"))
+                         :ns-map *feeds-ns-map*))
+
+(defmethod parse-feed-entry ((feed atom-feed) rawentry)
+  (flet ((find-string (expr)
+           (xpath:find-string rawentry expr :ns-map *feeds-ns-map*)))
+    (let ((author (feed-author feed)))
+      (make-instance 'entry
+                     :title (find-string "atom:title")
+                     :link (find-string "atom:link[@rel = 'alternate' or not(@rel)]/@href")
+                     :id (find-string "atom:id")
+                     :published (local-time:timestamp-to-universal (local-time:parse-timestring (find-string "atom:published")))
+                     :updated (find-string "atom:updated")
+                     :content (find-string "atom:content")
+                     :author author))))
+
+(defclass rss-2.0-feed (feed) ())
+
+(defmethod find-feed-entities ((feed rss-2.0-feed) rawfeed)
+  (xpath:eval-expression rawfeed
+                         (with-slots (category) feed
+                           (if category
+                               (format nil "/rss/channel/item[category = '~A']" category)
+                               "/rss/channel/item"))))
+
+(defmethod parse-feed-entry ((feed rss-2.0-feed) rawentry)
+  (flet ((find-string (expr)
+           (xpath:find-string rawentry expr :ns-map nil)))
+    (let ((author (feed-author feed)))
+      (make-instance 'entry
+                     :title (find-string "title")
+                     :link (find-string "link")
+                     :id (find-string "guid")
+                     :published (net.telent.date:parse-time (find-string "pubDate"))
+                     :updated nil
+                     :content (find-string "description")
+                     :author author))))
+  
+(defun update-feed-class (feed rawfeed)
+  (let* ((root-feed (xtree:root rawfeed))
+         (name (xtree:local-name root-feed))
+         (namespace (xtree:namespace-uri root-feed)))
+    (cond 
+      ((and (string= namespace "http://www.w3.org/2005/Atom")
+            (string= name "feed"))
+       (progn
+         (setf (slot-value feed 'author)
+               (make-author (xpath:find-string rawfeed
+                                               "/atom:feed/atom:title"
+                                               :ns-map *feeds-ns-map*)
+                            (xpath:find-string rawfeed
+                                               "/atom:feed/atom:link[@rel='alternate']/@href"
+                                               :ns-map *feeds-ns-map*)))
+         (change-class feed 'atom-feed)))
+      ((and (not namespace)
+            (string= name "rss")
+            (string= (xtree:attribute-value root-feed
+                                            "version")
+                     "2.0"))
+       (progn
+         (setf (slot-value feed 'author)
+               (make-author (xpath:find-string rawfeed "/rss/channel/title")
+                            (xpath:find-string rawfeed "/rss/channel/link")))
+         (change-class feed 'rss-2.0-feed)))
+      (t (error "not supported feed type")))))
 
 (defvar *feeds*)
 
+(defun define-feed (href &key category)
+  (push (make-instance 'feed
+                       :url href
+                       :category category)
+        *feeds*))
+
 (defparameter *planet.reader.package*
-  (defpackage :planet..reader
-    (:use)))
+  (defpackage :planet.reader
+    (:use)
+    (:import-from :planet :define-feed)))
 
 (defun load-feeds-from-file (path)
   (let ((*feeds* nil)
         (*package* *planet.reader.package*))
-    (load path)
-    *feeds*))
+      (load path)
+      *feeds*))
 
-  
 (defclass planet ()
   ((name :initarg :name :initform "PLANET" :accessor planet-name)
    (alternate-href :initarg :alternate-href :initform nil :accessor planet-alternate-href)
    (self-href :initarg :self-href :initform nil :accessor planet-self-href)
    (id :initarg :id :initform nil :accessor planet-id)
-   (feeds :initarg :feeds :initform nil)
+   (feeds :initarg :feeds :initform nil :reader planet-feeds)
+   (feeds-path :initarg :feeds-path :initform nil :reader planet-feeds-path)
    (syndicate-feed :initform nil :reader planet-syndicate-feed)
    (scheduler :initform nil)))
-
-(defgeneric planet-feeds (planet))
-
-(defmethod planet-feeds (planet)
-  (let ((feeds (slot-value planet 'feeds)))
-    (if (pathnamep feeds)
-        (load-feeds-from-file feeds)
-        feeds)))
 
 (defun planet-load-all (planet)
   "Load all feeds"
@@ -86,15 +159,19 @@
     (when syndicate-feed
       (xtree:release syndicate-feed)
       (setf syndicate-feed nil))
+    (with-slots (feeds feeds-path) planet
+      (when feeds-path
+        (setf feeds
+              (load-feeds-from-file feeds-path))))
     (let ((entries nil)
           (feeds (planet-feeds planet)))
       (iter (for feed in feeds)
             (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
-              (iter (for rawentry in-xpath-result (feed-find-entry-xpath-query feed) on rawfeed with-ns-map *feeds-ns-map*)
-                    (push (funcall (feed-parse-entry feed)
-                                   rawentry
-                                   (feed-author feed))
-                          entries))))
+              (update-feed-class feed rawfeed)
+              (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
+                (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
+                      (push (parse-feed-entry feed rawentry)
+                            entries)))))
       (setf syndicate-feed
             (xfactory:with-document-factory ((atom "http://www.w3.org/2005/Atom"))
               (atom :feed
@@ -165,7 +242,7 @@
            schedule))
   (tg:finalize planet #'planet-clear))
 
-(defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds)
+(defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds feeds-path)
   (when (and (boundp planet-name)
              (typep (symbol-value planet-name) 'planet))
     (planet-clear (symbol-value planet-name)))
@@ -176,62 +253,5 @@
                       :alternate-href ,alternate-href
                       :self-href ,self-href
                       :schedule ',schedule
-                      :feeds ,feeds))))
-
-;;; make-atom-feed
-
-(defun parse-atom-entry (node author)
-  (flet ((find-string (expr)
-           (xpath:find-string node expr :ns-map *feeds-ns-map*)))
-    (make-instance 'entry
-                   :title (find-string "atom:title")
-                   :link (find-string "atom:link[@rel = 'alternate' or not(@rel)]/@href")
-                   :id (find-string "atom:id")
-                   :published (local-time:timestamp-to-universal (local-time:parse-timestring (find-string "atom:published")))
-                   :updated (find-string "atom:updated")
-                   :content (find-string "atom:content")
-                   :author author)))
-
-(defun make-atom-feed (author-name author-href href &key category)
-  (make-instance 'feed
-                 :author (make-author author-name author-href)
-                 :url href
-                 :find-entry-xpath-query (if category
-                                             (format nil "/atom:feed/atom:entry[atom:category/@term='~A']" category)
-                                             "/atom:feed/atom:entry")
-                 :parse-entry #'parse-atom-entry))
-
-(defun define-atom-feed (author-name author-href href &key category)
-  (push (make-atom-feed author-name author-href href :category category)
-        *feeds*))
-
-(import 'define-atom-feed *planet.reader.package*)
-
-;;; make-rss-2.0-feed
-
-(defun parse-rss-item (node author)
-  (flet ((find-string (expr)
-           (xpath:find-string node expr :ns-map nil)))
-    (make-instance 'entry
-                   :title (find-string "title")
-                   :link (find-string "link")
-                   :id (find-string "guid")
-                   :published (net.telent.date:parse-time (find-string "pubDate"))
-                   :updated nil
-                   :content (find-string "description")
-                   :author author)))
-
-(defun make-rss-2.0-feed (author-name author-href href &key category)
-  (make-instance 'feed
-                 :author (make-author author-name author-href)
-                 :url href
-                 :find-entry-xpath-query (if category
-                                             (format nil "/rss/channel/item[category = '~A']" category)
-                                             "/rss/channel/item")
-                 :parse-entry #'parse-rss-item))
-
-(defun define-rss-feed (author-name author-href href &key category)
-  (push (make-rss-2.0-feed author-name author-href href :category category)
-        *feeds*))
-  
-(import 'define-rss-feed *planet.reader.package*)
+                      :feeds ,feeds
+                      :feeds-path ,feeds-path))))
