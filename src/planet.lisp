@@ -166,12 +166,14 @@
     (let ((entries nil)
           (feeds (planet-feeds planet)))
       (iter (for feed in feeds)
-            (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
-              (update-feed-class feed rawfeed)
-              (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
-                (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
-                      (push (parse-feed-entry feed rawentry)
-                            entries)))))
+            (ignore-errors
+              (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
+                (update-feed-class feed rawfeed)
+                (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
+                  (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
+                        (ignore-errors
+                          (push (parse-feed-entry feed rawentry)
+                                entries)))))))
       (setf syndicate-feed
             (xfactory:with-document-factory ((atom "http://www.w3.org/2005/Atom"))
               (atom :feed
