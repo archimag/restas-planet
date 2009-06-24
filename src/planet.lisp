@@ -17,6 +17,7 @@
            :author-uri
            :feed
            :feed-author
+           :feed-url
            :*feeds-ns-map*
            ))
 
