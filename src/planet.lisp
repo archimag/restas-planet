@@ -150,7 +150,7 @@
    (alternate-href :initarg :alternate-href :initform nil :accessor planet-alternate-href)
    (self-href :initarg :self-href :initform nil :accessor planet-self-href)
    (id :initarg :id :initform nil :accessor planet-id)
-   (feeds :initarg :feeds :initform nil :reader planet-feeds)
+   (feeds :initarg :feeds :initform nil :accessor planet-feeds)
    (feeds-path :initarg :feeds-path :initform nil :reader planet-feeds-path)
    (syndicate-feed :initform nil :reader planet-syndicate-feed)
    (scheduler :initform nil)))
