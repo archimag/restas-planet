@@ -5,6 +5,7 @@
   (:export :make-atom-feed
            :make-rss-2.0-feed
            :load-feeds-from-file
+           :load-planet-traits
            :planet
            :defplanet
            :planet-feeds
@@ -128,6 +129,7 @@
       (t (error "not supported feed type")))))
 
 (defvar *feeds*)
+(defvar *planetname*)
 
 (defun define-feed (href &key category)
   (push (make-instance 'feed
@@ -135,16 +137,27 @@
                        :category category)
         *feeds*))
 
+(defun define-planet (name)
+  (setf *planetname* name))
+
 (defparameter *planet.reader.package*
   (defpackage :planet.reader
     (:use)
-    (:import-from :planet :define-feed)))
+    (:import-from :planet :define-feed :define-planet)))
 
 (defun load-feeds-from-file (path)
   (let ((*feeds* nil)
         (*package* *planet.reader.package*))
       (load path)
       *feeds*))
+
+(defun load-planet-traits (path)
+  (let ((*feeds* nil)
+        (*planetname* nil)
+        (*package* *planet.reader.package*))
+      (load path)
+      (list *planetname* *feeds*)))
+  
 
 (defclass planet ()
   ((name :initarg :name :initform "PLANET" :accessor planet-name)
