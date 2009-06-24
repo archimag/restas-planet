@@ -8,12 +8,14 @@
            :planet
            :defplanet
            :planet-feeds
+           :planet-name
            :planet-load-all
            :planet-syndicate-feed
            :planet-clear
            :author
            :author-name
            :author-uri
+           :feed
            :feed-author
            :*feeds-ns-map*
            ))
@@ -239,8 +241,8 @@
 
 (defmethod initialize-instance ((planet planet) &key (schedule '(:hour *)) &allow-other-keys)
   (call-next-method)
-  (setf (slot-value planet 'syndicate-feed)
-        (xtree:parse "<feed xmlns=\"http://www.w3.org/2005/Atom\" />"))
+;;   (setf (slot-value planet 'syndicate-feed)
+;;         (xtree:parse "<feed xmlns=\"http://www.w3.org/2005/Atom\" />"))
   (when schedule
     (apply #'planet-reset-scheduler 
            planet
