@@ -4,6 +4,8 @@
   (:use :cl :iter :planet)
   (:basepath (asdf:component-pathname (asdf:find-system :planet-standalone))))
 
+(defun compute-user-login-name ())
+
 (in-package :restas-planet-plugin)
 
 (defplanet *planet* 
@@ -15,7 +17,6 @@
 (define-filesystem-route resources ":(file)" "resources/${file}")
 
 (define-simple-route atom ("atom.xml")
-  (declare (ignore bindings))
   (planet-syndicate-feed *planet*))
 
 (defun eid (value)
@@ -28,7 +29,6 @@
   (xfactory:attributes :href value))
 
 (define-simple-route main ("")
-  (declare (ignore bindings))
   (gp:object-register
    (xfactory:with-document-factory ((xhtml "http://www.w3.org/1999/xhtml"))
      (xhtml :html

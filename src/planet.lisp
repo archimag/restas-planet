@@ -187,7 +187,10 @@
                           (xfactory:text (or (planet-id planet)
                                              (planet-alternate-href planet))))
 
-                    (iter (for entry in (sort entries #'> :key #'entry-published-universal))
+                    (iter (for entry in (let ((s (sort entries #'> :key #'entry-published-universal)))
+                                          (if (> (length s) 50)
+                                              (subseq s 0 50)
+                                              s)))
                           (with-slots (title link id published updated content author) entry
                             (atom :entry
                                   (atom :title (xfactory:text title))
