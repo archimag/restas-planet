@@ -156,7 +156,7 @@
         (*planetname* nil)
         (*package* *planet.reader.package*))
       (load path)
-      (list *planetname* *feeds*)))
+      (cons *planetname* *feeds*)))
   
 
 (defclass planet ()
