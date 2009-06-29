@@ -134,6 +134,7 @@
 (defun define-feed (href &key category author)
   (push (make-instance 'feed
                        :url href
+                       :author (make-author (car author) (cdr author))
                        :category category)
         *feeds*))
 
