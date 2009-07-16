@@ -262,7 +262,8 @@
     (apply #'planet-reset-scheduler 
            planet
            schedule))
-  (tg:finalize planet #'planet-clear))
+;;  (tg:finalize planet #'planet-clear)
+  )
 
 (defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds feeds-path)
   (when (and (boundp planet-name)
