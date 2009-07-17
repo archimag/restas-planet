@@ -218,7 +218,9 @@
                                         (xfactory:text (local-time:format-timestring nil
                                                                                      (local-time:universal-to-timestamp published))))
                                   (if updated (atom :updated (xfactory:text updated)))
-                                  (atom :content (xfactory:text content))
+                                  (atom :content
+                                        (xfactory:attributes "type" "html")
+                                        (xfactory:text content))
                                   (atom :author
                                         (atom :name (xfactory:text (author-name author)))
                                         (atom :uri (xfactory:text (author-uri author)))))))))))))
