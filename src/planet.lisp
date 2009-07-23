@@ -45,7 +45,8 @@
    (author :initarg :author :initform nil)))
 
 (defun entry-published-universal (entry)
-  (slot-value entry 'published))
+  (or (slot-value entry 'published)
+      0))
 
 (defclass feed ()
   ((author :initarg :author :initform nil :reader feed-author)
