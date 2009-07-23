@@ -19,6 +19,7 @@
            :feed
            :feed-author
            :feed-url
+           :feed-category
            :*feeds-ns-map*
            ))
 
@@ -51,7 +52,7 @@
 (defclass feed ()
   ((author :initarg :author :initform nil :reader feed-author)
    (url :initarg :url :reader feed-url)
-   (category :initarg :category :initform nil :reader feed-category)))
+   (category :initarg :category :initform nil :accessor feed-category)))
 
 (defgeneric find-feed-entities (feed rawfeed))
 (defgeneric parse-feed-entry (feed rawentry))
@@ -145,7 +146,7 @@
 (defparameter *planet.reader.package*
   (defpackage :planet.reader
     (:use)
-    (:import-from :planet :define-feed :define-planet)))
+    (:import-from :planet :define-feed :define-planet :nil)))
 
 (defun load-feeds-from-file (path)
   (let ((*feeds* nil)
