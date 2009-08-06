@@ -6,6 +6,6 @@
 (in-package :planet-standalone-system)
 
 (defsystem :planet-standalone
-  :depends-on (#:planet #:restas-new)
+  :depends-on (#:planet #:restas)
   :components ((:module :src
                        :components ((:file "standalone")))))
