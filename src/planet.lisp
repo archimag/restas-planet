@@ -174,10 +174,8 @@
 
 (defun planet-load-all (planet)
   "Load all feeds"
-  (with-slots (syndicate-feed) planet
-    (when syndicate-feed
-      (xtree:release syndicate-feed)
-      (setf syndicate-feed nil))
+  (warn "planet-load-all start")
+  (let ((syndicate nil))
     (with-slots (feeds feeds-path) planet
       (when feeds-path
         (setf feeds
@@ -187,13 +185,14 @@
       (iter (for feed in feeds)
             (ignore-errors
               (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
-                (update-feed-class feed rawfeed)
-                (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
-                  (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
-                        (ignore-errors
-                          (push (parse-feed-entry feed rawentry)
-                                entries)))))))
-      (setf syndicate-feed
+                (when rawfeed
+                  (update-feed-class feed rawfeed)
+                  (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
+                    (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
+                          (ignore-errors
+                            (push (parse-feed-entry feed rawentry)
+                                  entries))))))))
+      (setf syndicate
             (xfactory:with-document-factory ((atom "http://www.w3.org/2005/Atom"))
               (atom :feed
                     (atom :title
@@ -225,7 +224,12 @@
                                         (xfactory:text content))
                                   (atom :author
                                         (atom :name (xfactory:text (author-name author)))
-                                        (atom :uri (xfactory:text (author-uri author)))))))))))))
+                                        (atom :uri (xfactory:text (author-uri author)))))))))))
+    (when syndicate
+      (setf (slot-value planet 'syndicate-feed)
+            syndicate))
+    (warn "planet-load-all end")
+    ))
                               
 (defun planet-stop-scheduler (planet)
   "Stop planet scheduler"
@@ -265,9 +269,7 @@
   (when schedule
     (apply #'planet-reset-scheduler 
            planet
-           schedule))
-;;  (tg:finalize planet #'planet-clear)
-  )
+           schedule)))
 
 (defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds feeds-path)
   (when (and (boundp planet-name)
@@ -279,6 +281,6 @@
                       :name ,name
                       :alternate-href ,alternate-href
                       :self-href ,self-href
-                      :schedule ',schedule
                       :feeds ,feeds
-                      :feeds-path ,feeds-path))))
+                      :feeds-path ,feeds-path))
+     (apply #'planet-reset-scheduler ,planet-name ',schedule)))
