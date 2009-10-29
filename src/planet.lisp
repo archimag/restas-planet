@@ -1,27 +1,26 @@
 ;;; planet.lisp
 
 (defpackage :planet
-  (:use :cl :iter)
-  (:export :make-atom-feed
-           :make-rss-2.0-feed
-           :load-feeds-from-file
-           :load-planet-traits
-           :planet
-           :defplanet
-           :planet-feeds
-           :planet-name
-           :planet-load-all
-           :planet-syndicate-feed
-           :planet-clear
-           :author
-           :author-name
-           :author-uri
-           :feed
-           :feed-author
-           :feed-url
-           :feed-category
-           :*feeds-ns-map*
-           ))
+  (:use #:cl #:iter)
+  (:export #:make-atom-feed
+           #:make-rss-2.0-feed
+           #:load-feeds-from-file
+           #:load-planet-traits
+           #:planet
+           #:defplanet
+           #:planet-feeds
+           #:planet-name
+           #:planet-load-all
+           #:planet-syndicate-feed
+           #:planet-clear
+           #:author
+           #:author-name
+           #:author-uri
+           #:feed
+           #:feed-author
+           #:feed-url
+           #:feed-category
+           #:*feeds-ns-map*))
 
 (in-package :planet)
 
@@ -235,7 +234,7 @@
   "Stop planet scheduler"
   (with-slots (scheduler) planet
     (when scheduler
-      (sb-ext:unschedule-timer scheduler)
+      #+sbcl(sb-ext:unschedule-timer scheduler)
       (setf scheduler nil))))
           
 (defun planet-reset-scheduler (planet &key second minute hour day-of-month month year day-of-week)
@@ -264,8 +263,6 @@
 
 (defmethod initialize-instance ((planet planet) &key (schedule '(:hour *)) &allow-other-keys)
   (call-next-method)
-;;   (setf (slot-value planet 'syndicate-feed)
-;;         (xtree:parse "<feed xmlns=\"http://www.w3.org/2005/Atom\" />"))
   (when schedule
     (apply #'planet-reset-scheduler 
            planet

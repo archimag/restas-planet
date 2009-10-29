@@ -2,9 +2,9 @@
 
 (defpackage :planet.resource
   (:use :cl)
-  (:export :css-file
-           :feed-icon/10x10
-           :feed-icon/14x14))
+  (:export #:css-file
+           #:feed-icon/10x10
+           #:feed-icon/14x14))
 
 (in-package :planet.resource)
 
