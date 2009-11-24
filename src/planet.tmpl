@@ -1,0 +1,91 @@
+// -*- mode: html -*-
+// planet.tmpl
+
+{namespace restas.planet.view}
+
+{template atom-feed}
+    <?xml version="1.0" encoding="utf-8"?>{\n}
+
+    <feed xmlns="http://www.w3.org/2005/Atom">
+        <title>{$name}</title>
+        <link rel="self" type="application/atom+xml" href="{$hrefAtom}" />
+        <link rel="alternate" type="text/html" href="{$hrefHtml}" />
+        <id>{$hrefAlternate}</id>
+
+        {foreach $entry in $entryList}
+            <entry>
+                <title>{$entry.title ? $entry.title : '*notitle*'}</title>
+                <id>{$entry.id}</id>
+                <link href="{$entry.link}" />
+                <published>{$entry.published}</published>
+                {if $entry.updated}<updated>{$entry.updated}</updated>{/if}
+                <content type="html"><![CDATA[{$entry.content}]]></content>
+                <author>
+                    <name>{$entry.author.name}</name>
+                    <uri>{$entry.author.uri}</uri>
+                </author>
+            </entry>
+        {/foreach}
+    </feed>
+{/template}
+
+{template feed-html-authors}
+    <ul id="authors">
+        {foreach $author in $authors}
+            <li>
+                <a href="{$author.uri}">{$author.name}</a>
+            </li>
+        {/foreach}
+    </ul>
+{/template}
+
+{template feed-html-content}
+    {foreach $entry in $entryList}
+        <div class="entry">
+            <div class="entry-title">
+                <a href="{$entry.link}">{$entry.title ? $entry.title : '*notitle*'}</a>
+
+                <div class="entry-author-info">
+                    <strong>Источник: </strong>
+                    <a href="{$entry.author.uri}">{$entry.author.name}</a>
+                </div>
+            </div>
+            
+            <div class="entry-content">
+                {$entry.content}
+            </div>
+        </div>
+    {/foreach}
+{/template}
+
+{template feed-html}
+   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+   {\n}
+   <html xmlns="http://www.w3.org/1999/xhtml" >
+       <head>
+           <title>{$name}</title>
+           <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+           <link rel="alternate" href="{$hrefAtom}" type="application/atom+xml" title="{$name}"/>
+           <link href="planet.css" rel="stylesheet" type="text/css" />
+       </head>
+       
+       <body>
+           <h1>{$name}</h1>
+
+           <div id="planet-body">
+           <div id="planet-info-panel">
+               <div id="syndicate">
+                   <a href="{$hrefAtom}">Подписаться</a>
+               </div>
+    
+               <h3>Авторы</h3>    
+               {call feed-html-authors data="all" /}
+           </div>
+           
+           <div id="planet-content">
+               {call feed-html-content data="all" /}
+           </div>
+           </div>
+       </body>
+   </html>
+{/template}

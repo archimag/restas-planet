@@ -13,9 +13,11 @@
 }
 
 .entry-title a {
-    font-weight: normal;
-    color: #6a5eab;
     text-decoration: none;
+}
+
+.entry-title a:hover {
+    text-decoration: underline;
 }
 
 .entry-author-info {
@@ -25,7 +27,6 @@
 }
 
 .entry-content {
-    /*background-color: white;*/
     padding-left: 10px;
 }
 
@@ -66,12 +67,9 @@
 }
 
 #planet-info-panel ul {
-    list-style-image: url(feed-icon-10x10.png);
-    margin-left: 15px;
+    list-style: none;
     padding: 0;
 }
 
-#authors a {
-    color: #6a5eab;
-    text-decoration: none;
-}
+#authors li { padding: 5px 0; }
+

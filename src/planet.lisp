@@ -1,283 +1,69 @@
-;;; planet.lisp
+;;;; planet.lisp
 
-(defpackage :planet
-  (:use #:cl #:iter)
-  (:export #:make-atom-feed
-           #:make-rss-2.0-feed
-           #:load-feeds-from-file
-           #:load-planet-traits
-           #:planet
-           #:defplanet
-           #:planet-feeds
-           #:planet-name
-           #:planet-load-all
-           #:planet-syndicate-feed
-           #:planet-clear
-           #:author
-           #:author-name
-           #:author-uri
-           #:feed
-           #:feed-author
-           #:feed-url
-           #:feed-category
-           #:*feeds-ns-map*))
+(in-package #:restas.planet)
 
-(in-package :planet)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; preferences
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter *feeds-ns-map* '(("atom" "http://www.w3.org/2005/Atom")))
+(defvar *name* "PLANET")
 
-(defclass author ()
-  ((name :initarg :name :initform "" :reader author-name)
-   (uri :initarg :uri :initform "" :reader author-uri)))
+(defvar *feeds* nil)
 
-(defun make-author (name uri)
-  (make-instance 'author
-                 :name name
-                 :uri uri))
-  
-(defclass entry ()
-  ((title :initarg :title :initform "")
-   (link :initarg :link :initform nil )
-   (id :initarg :id :initform nil)
-   (published :initarg :published :initform nil)
-   (updated :initarg :updated :initform nil)
-   (content :initarg :content :initform "")
-   (author :initarg :author :initform nil)))
+(defvar *spider* nil)
 
-(defun entry-published-universal (entry)
-  (or (slot-value entry 'published)
-      0))
+(defvar *schedule* '(:hour *))
 
-(defclass feed ()
-  ((author :initarg :author :initform nil :reader feed-author)
-   (url :initarg :url :reader feed-url)
-   (category :initarg :category :initform nil :accessor feed-category)))
+(restas:define-initialization (context)
+  (restas:with-context context
+    (when *feeds*
+      (restas:context-add-variable context
+                                   '*spider*
+                                   (make-instance 'spider
+                                                  :feeds *feeds*
+                                                  :schedule *schedule*)))))
 
-(defgeneric find-feed-entities (feed rawfeed))
-(defgeneric parse-feed-entry (feed rawentry))
+(restas:define-finalization (context)
+  (let ((spider (restas:context-symbol-value context '*spider*)))
+    (when spider
+      (spider-stop-scheduler spider))))
+                                   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; compile view templates
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass atom-feed (feed) ())
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (closure-template:compile-template :common-lisp-backend
+                                     (merge-pathnames "src/planet.tmpl"
+                                                      (asdf:component-pathname (asdf:find-system '#:restas-planet)))))
 
-(defmethod find-feed-entities ((feed atom-feed) rawfeed)
-  (xpath:eval-expression rawfeed
-                         (with-slots (category) feed
-                           (if category
-                               (format nil "/atom:feed/atom:entry[atom:category/@term='~A']" category)
-                               "/atom:feed/atom:entry"))
-                         :ns-map *feeds-ns-map*))
 
-(defmethod parse-feed-entry ((feed atom-feed) rawentry)
-  (flet ((find-string (expr)
-           (xpath:find-string rawentry expr :ns-map *feeds-ns-map*)))
-    (let ((author (feed-author feed)))
-      (make-instance 'entry
-                     :title (find-string "atom:title")
-                     :link (find-string "atom:link[@rel = 'alternate' or not(@rel)]/@href")
-                     :id (find-string "atom:id")
-                     :published (local-time:timestamp-to-universal (local-time:parse-timestring (find-string "atom:published")))
-                     :updated (find-string "atom:updated")
-                     :content (find-string "atom:content")
-                     :author author))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; implementation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass rss-2.0-feed (feed) ())
 
-(defmethod find-feed-entities ((feed rss-2.0-feed) rawfeed)
-  (xpath:eval-expression rawfeed
-                         (with-slots (category) feed
-                           (if category
-                               (format nil "/rss/channel/item[category = '~A']" category)
-                               "/rss/channel/item"))))
+(defparameter *resource-dir*
+  (merge-pathnames "resources/"
+                   (asdf:component-pathname (asdf:find-system '#:restas-planet))))
 
-(defmethod parse-feed-entry ((feed rss-2.0-feed) rawentry)
-  (flet ((find-string (expr)
-           (xpath:find-string rawentry expr :ns-map nil)))
-    (let ((author (feed-author feed)))
-      (make-instance 'entry
-                     :title (find-string "title")
-                     :link (find-string "link")
-                     :id (find-string "guid")
-                     :published (net.telent.date:parse-time (find-string "pubDate"))
-                     :updated nil
-                     :content (find-string "description")
-                     :author author))))
-  
-(defun update-feed-class (feed rawfeed)
-  (let* ((root-feed (xtree:root rawfeed))
-         (name (xtree:local-name root-feed))
-         (namespace (xtree:namespace-uri root-feed)))
-    (cond 
-      ((and (string= namespace "http://www.w3.org/2005/Atom")
-            (string= name "feed"))
-       (progn
-         (setf (slot-value feed 'author)
-               (make-author (xpath:find-string rawfeed
-                                               "/atom:feed/atom:title"
-                                               :ns-map *feeds-ns-map*)
-                            (xpath:find-string rawfeed
-                                               "/atom:feed/atom:link[@rel='alternate']/@href"
-                                               :ns-map *feeds-ns-map*)))
-         (change-class feed 'atom-feed)))
-      ((and (not namespace)
-            (string= name "rss")
-            (string= (xtree:attribute-value root-feed
-                                            "version")
-                     "2.0"))
-       (progn
-         (setf (slot-value feed 'author)
-               (make-author (xpath:find-string rawfeed "/rss/channel/title")
-                            (xpath:find-string rawfeed "/rss/channel/link")))
-         (change-class feed 'rss-2.0-feed)))
-      (t (error "not supported feed type")))))
+(defun planet-path (path)
+  (merge-pathnames path *resource-dir*))
 
-(defvar *feeds*)
-(defvar *planetname*)
+(define-route planet-resources (":(file)")
+  (planet-path file))
 
-(defun define-feed (href &key category author)
-  (push (make-instance 'feed
-                       :url href
-                       :author (if author (make-author (car author) (cdr author)))
-                       :category category)
-        *feeds*))
+(defun prepare-planet-data ()
+  (list :entry-list (spider-syndicate-feed *spider*)
+        :authors (spider-feeds-authors *spider*)
+        :href-atom (restas:genurl-with-host 'planet-atom)
+        :href-html (restas:genurl-with-host 'planet-main)
+        :name *name*))
 
-(defun define-planet (name)
-  (setf *planetname* name))
+(define-route planet-atom ("atom.xml"
+                           :content-type "application/atom+xml")
+  (restas.planet.view:atom-feed (prepare-planet-data)))
 
-(defparameter *planet.reader.package*
-  (defpackage :planet.reader
-    (:use)
-    (:import-from :planet :define-feed :define-planet :nil)))
+(define-route planet-main ("")
+  (restas.planet.view:feed-html (prepare-planet-data)))
 
-(defun load-feeds-from-file (path)
-  (let ((*feeds* nil)
-        (*package* *planet.reader.package*))
-      (load path)
-      *feeds*))
-
-(defun load-planet-traits (path)
-  (let ((*feeds* nil)
-        (*planetname* nil)
-        (*package* *planet.reader.package*))
-      (load path)
-      (cons *planetname* *feeds*)))
-  
-
-(defclass planet ()
-  ((name :initarg :name :initform "PLANET" :accessor planet-name)
-   (alternate-href :initarg :alternate-href :initform nil :accessor planet-alternate-href)
-   (self-href :initarg :self-href :initform nil :accessor planet-self-href)
-   (id :initarg :id :initform nil :accessor planet-id)
-   (feeds :initarg :feeds :initform nil :accessor planet-feeds)
-   (feeds-path :initarg :feeds-path :initform nil :reader planet-feeds-path)
-   (syndicate-feed :initform nil :reader planet-syndicate-feed)
-   (scheduler :initform nil)))
-
-(defun planet-load-all (planet)
-  "Load all feeds"
-  (warn "planet-load-all start")
-  (let ((syndicate nil))
-    (with-slots (feeds feeds-path) planet
-      (when feeds-path
-        (setf feeds
-              (load-feeds-from-file feeds-path))))
-    (let ((entries nil)
-          (feeds (planet-feeds planet)))
-      (iter (for feed in feeds)
-            (ignore-errors
-              (xtree:with-parse-document (rawfeed (puri:parse-uri (feed-url feed)))
-                (when rawfeed
-                  (update-feed-class feed rawfeed)
-                  (xtree:with-object (nodeset (find-feed-entities feed rawfeed))
-                    (iter (for rawentry in-nodeset (xpath:xpath-object-value nodeset))
-                          (ignore-errors
-                            (push (parse-feed-entry feed rawentry)
-                                  entries))))))))
-      (setf syndicate
-            (xfactory:with-document-factory ((atom "http://www.w3.org/2005/Atom"))
-              (atom :feed
-                    (atom :title
-                          (xfactory:text (planet-name planet)))
-                    (atom :link
-                          (xfactory:attributes :rel "self" :type "text/xml" :href (planet-self-href planet)))
-                    (atom :link
-                          (xfactory:attributes :rel "alternate" :type "text/html" :href (planet-alternate-href planet)))
-                    (atom :id
-                          (xfactory:text (or (planet-id planet)
-                                             (planet-alternate-href planet))))
-
-                    (iter (for entry in (let ((s (sort entries #'> :key #'entry-published-universal)))
-                                          (if (> (length s) 50)
-                                              (subseq s 0 50)
-                                              s)))
-                          (with-slots (title link id published updated content author) entry
-                            (atom :entry
-                                  (atom :title (xfactory:text title))
-                                  (atom :id (xfactory:text id))
-                                  (atom :link
-                                        (xfactory:attributes :href link))
-                                  (atom :published
-                                        (xfactory:text (local-time:format-timestring nil
-                                                                                     (local-time:universal-to-timestamp published))))
-                                  (if updated (atom :updated (xfactory:text updated)))
-                                  (atom :content
-                                        (xfactory:attributes "type" "html")
-                                        (xfactory:text content))
-                                  (atom :author
-                                        (atom :name (xfactory:text (author-name author)))
-                                        (atom :uri (xfactory:text (author-uri author)))))))))))
-    (when syndicate
-      (setf (slot-value planet 'syndicate-feed)
-            syndicate))
-    (warn "planet-load-all end")
-    ))
-                              
-(defun planet-stop-scheduler (planet)
-  "Stop planet scheduler"
-  (with-slots (scheduler) planet
-    (when scheduler
-      #+sbcl(sb-ext:unschedule-timer scheduler)
-      (setf scheduler nil))))
-          
-(defun planet-reset-scheduler (planet &key second minute hour day-of-month month year day-of-week)
-  "Reset planet scheduler"
-  (planet-stop-scheduler planet)
-  (with-slots (scheduler) planet
-      (setf scheduler
-            (clon:schedule-function #'(lambda () (planet-load-all planet))
-                                    (clon:make-scheduler (clon:make-typed-cron-schedule :second second
-                                                                                        :minute minute
-                                                                                        :hour hour
-                                                                                        :day-of-month day-of-month
-                                                                                        :month month
-                                                                                        :year year
-                                                                                        :day-of-week day-of-week)
-                                                         :allow-now-p t)
-                                    :thread t))))
-
-(defun planet-clear (planet)
-  (planet-stop-scheduler planet)
-  (with-slots (syndicate-feed) planet
-    (when syndicate-feed
-      (xtree:release syndicate-feed)
-      (setf syndicate-feed nil)))
-  planet)
-
-(defmethod initialize-instance ((planet planet) &key (schedule '(:hour *)) &allow-other-keys)
-  (call-next-method)
-  (when schedule
-    (apply #'planet-reset-scheduler 
-           planet
-           schedule)))
-
-(defmacro defplanet (planet-name &key name alternate-href self-href (schedule '(:hour *)) feeds feeds-path)
-  (when (and (boundp planet-name)
-             (typep (symbol-value planet-name) 'planet))
-    (planet-clear (symbol-value planet-name)))
-  `(progn
-     (defparameter ,planet-name
-       (make-instance 'planet
-                      :name ,name
-                      :alternate-href ,alternate-href
-                      :self-href ,self-href
-                      :feeds ,feeds
-                      :feeds-path ,feeds-path))
-     (apply #'planet-reset-scheduler ,planet-name ',schedule)))
