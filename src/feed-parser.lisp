@@ -14,6 +14,9 @@
   (list :name name
         :uri uri))
 
+(defun author-name (author)
+  (getf author :name))
+
 (defun make-entry (&key title link id published updated content author)
   (list :title title
         :link link

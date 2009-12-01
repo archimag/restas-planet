@@ -60,7 +60,9 @@
                                  items
                                  (cdr res))))))
     (setf (slot-value spider 'feeds-authors)
-          (nreverse authors))
+          (sort authors
+                #'string<
+                :key #'author-name))
     (setf (slot-value spider 'syndicate-feed)
           (iter (for item in (sort items #'> :key #'entry-published-universal))
                 (for i from 0 below 50)
