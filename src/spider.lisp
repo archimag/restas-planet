@@ -11,7 +11,7 @@
 (defclass spider ()
   ((feeds :initarg :feeds :initform nil)
    (feeds-authors :initform nil :reader spider-feeds-authors)
-   (cache-dir :initarg cache-dir :initform nil)
+   (cache-dir :initarg :cache-dir :initform nil)
    (syndicate-feed :initform nil :reader spider-syndicate-feed)
    (scheduler :initform nil)))
            
@@ -23,18 +23,42 @@
       (pathname (load-feeds-traits-from-file slot-feeds))
       (otherwise (error "Bad type of spider feeds: ~A" (type-of slot-feeds))))))
 
+(defparameter *spider-readtable* (with-standard-io-syntax (copy-readtable)))
+
+(let ((*readtable* *spider-readtable*))
+  (local-time:enable-read-macros))
+
 (defun spider-load-all-feeds (spider)
   (let ((authors nil)
-        (items nil))
+        (items nil)
+        (cache-dir (slot-value spider 'cache-dir)))
     (iter (for traits in (spider-feeds-traits spider))
-          (let ((res (parse-feed (slot-value traits 'url)
+          (let ((cache (if cache-dir
+                           (merge-pathnames (calc-sha1-sum (format nil
+                                                                   "~A&~A"
+                                                                   (slot-value traits 'url)
+                                                                   (slot-value traits 'category)))
+                                            cache-dir)))
+                (res (parse-feed (slot-value traits 'url)
                                  (slot-value traits 'category))))
-            (push (car res)
-                  authors)
-            (setf items
-                  (concatenate 'list
-                               items
-                               (cdr res)))))
+            (when cache
+              (if res
+                  (with-open-file (out cache :direction :output :if-exists :supersede :if-does-not-exist :create)
+                    (with-standard-io-syntax
+                      (write res :stream out)))
+                  (ignore-errors
+                    (with-open-file (in cache :element-type 'extended-char)
+                      (with-standard-io-syntax
+                        (let ((*readtable* *spider-readtable*))
+                          (setf res
+                                (read in))))))))
+            (when res
+              (push (car res)
+                    authors)
+              (setf items
+                    (concatenate 'list
+                                 items
+                                 (cdr res))))))
     (setf (slot-value spider 'feeds-authors)
           (nreverse authors))
     (setf (slot-value spider 'syndicate-feed)

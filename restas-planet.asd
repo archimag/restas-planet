@@ -12,7 +12,7 @@
 (in-package #:restas-planet-system)
 
 (defsystem restas-planet
-    :depends-on (#:net-telent-date #:local-time #:clon #:restas #:closure-template #:cl-libxml2)
+    :depends-on (#:net-telent-date #:local-time #:clon #:restas #:closure-template #:cl-libxml2 #:ironclad)
     :components
     ((:module :src
               :components

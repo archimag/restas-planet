@@ -7,9 +7,10 @@
 
 
 (restas:define-plugin #:restas.planet
-  (:use #:cl #:iter)
+  (:use #:cl #:iter #:restas.optional)
   (:export #:*name*
            #:*suggest-mail*
            #:*feeds*
            #:*schedule*
+           #:*cache-dir*
            #:*template*))

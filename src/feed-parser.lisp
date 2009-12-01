@@ -74,7 +74,8 @@
   (:documentation "Parse feed in any format")
   (:method (feed &optional category)
     (xtree:with-parse-document (rawfeed feed)
-      (parse-feed rawfeed category))))
+      (if rawfeed
+          (parse-feed rawfeed category)))))
 
 (defmethod parse-feed ((rawfeed xtree:document) &optional category)  
   (let* ((root-feed (xtree:root rawfeed))

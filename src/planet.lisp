@@ -33,6 +33,8 @@
 
 (defvar *template* 'restas.planet.view:feed-html)
 
+(defvar *cache-dir* nil)
+
 (restas:define-initialization (context)
   (restas:with-context context
     (when *feeds*
@@ -40,7 +42,10 @@
                                    '*spider*
                                    (make-instance 'spider
                                                   :feeds *feeds*
-                                                  :schedule *schedule*)))))
+                                                  :schedule *schedule*
+                                                  :cache-dir (if *cache-dir*
+                                                                 (ensure-directories-exist (merge-pathnames "spider/"
+                                                                                                            *cache-dir*))))))))
 
 (restas:define-finalization (context)
   (let ((spider (restas:context-symbol-value context '*spider*)))
@@ -64,6 +69,7 @@
 (defun prepare-planet-data ()
   (list :entry-list (spider-syndicate-feed *spider*)
         :authors (spider-feeds-authors *spider*)
+        :css (list (restas:genurl 'planet-resources :file "planet.css"))
         :href-atom (restas:genurl-with-host 'planet-atom)
         :href-html (restas:genurl-with-host 'planet-main)
         :name *name*
