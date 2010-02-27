@@ -6,7 +6,7 @@
 ;;;; Author: Moskvitin Andrey <archimag@gmail.com>
 
 
-(restas:define-plugin #:restas.planet
+(restas:define-module #:restas.planet
   (:use #:cl #:iter #:restas.optional)
   (:export #:*name*
            #:*suggest-mail*

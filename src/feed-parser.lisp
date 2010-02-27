@@ -51,7 +51,8 @@
                             :id (find-string "atom:id")
                             :published (local-time:parse-timestring (find-string "atom:published"))
                             :updated (find-string "atom:updated")
-                            :content (find-string "atom:content")
+                            :content (or (find-string "atom:content")
+                                         (find-string "atom:summary"))
                             :author author)))))))
 
 (defun parse-rss-2.0-feed (rawfeed &optional category)
