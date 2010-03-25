@@ -76,9 +76,11 @@
         :suggest-mail *suggest-mail*))
 
 (define-route planet-atom ("atom.xml"
-                           :content-type "application/atom+xml")
-  (restas.planet.view:atom-feed (prepare-planet-data)))
+                           :content-type "application/atom+xml"
+                           :render-method 'restas.planet.view:atom-feed)
+  (prepare-planet-data))
 
-(define-route planet-main ("")
-  (funcall *template* (prepare-planet-data)))
+(define-route planet-main (""
+                           :render-method #'(lambda (data) (funcall *template* data)))
+  (prepare-planet-data))
 
