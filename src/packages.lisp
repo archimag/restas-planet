@@ -7,7 +7,7 @@
 
 
 (restas:define-module #:restas.planet
-  (:use #:cl #:iter #:restas.optional)
+  (:use #:cl #:iter)
   (:export #:*name*
            #:*suggest-mail*
            #:*feeds*

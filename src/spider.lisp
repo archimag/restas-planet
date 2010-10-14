@@ -28,6 +28,13 @@
 (let ((*readtable* *spider-readtable*))
   (local-time:enable-read-macros))
 
+(defun calc-sha1-sum (val)
+  "Calc sha1 sum of the val (string)"
+  (ironclad:byte-array-to-hex-string
+   (ironclad:digest-sequence :sha1
+                             (babel:string-to-octets val :encoding :utf-8))))
+
+
 (defun spider-load-all-feeds (spider)
   (let ((authors nil)
         (items nil)
