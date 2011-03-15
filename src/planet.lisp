@@ -35,7 +35,7 @@
 
 (defvar *cache-dir* nil)
 
-(restas:define-initialization (context)
+(defmethod restas:initialize-module-instance ((module (eql #.*package*)) context)
   (restas:with-context context
     (when *feeds*
       (restas:context-add-variable context
@@ -47,7 +47,7 @@
                                                                  (ensure-directories-exist (merge-pathnames "spider/"
                                                                                                             *cache-dir*))))))))
 
-(restas:define-finalization (context)
+(defmethod restas:finalize-module-instance ((module (eql #.*package*)) context)
   (let ((spider (restas:context-symbol-value context '*spider*)))
     (when spider
       (spider-stop-scheduler spider))))
@@ -63,24 +63,24 @@
 (defun planet-path (path)
   (merge-pathnames path *resource-dir*))
 
-(define-route planet-resources (":(file)")
+(restas:define-route planet-resources (":(file)")
   (planet-path file))
 
 (defun prepare-planet-data ()
   (list :entry-list (spider-syndicate-feed *spider*)
         :authors (spider-feeds-authors *spider*)
         :css (list (restas:genurl 'planet-resources :file "planet.css"))
-        :href-atom (restas:genurl-with-host 'planet-atom)
-        :href-html (restas:genurl-with-host 'planet-main)
+        :href-atom (restas:gen-full-url 'planet-atom)
+        :href-html (restas:gen-full-url 'planet-main)
         :name *name*
         :suggest-mail *suggest-mail*))
 
-(define-route planet-atom ("atom.xml"
-                           :content-type "application/atom+xml"
-                           :render-method 'restas.planet.view:atom-feed)
+(restas:define-route planet-atom ("atom.xml"
+                                  :content-type "application/atom+xml"
+                                  :render-method 'restas.planet.view:atom-feed)
   (prepare-planet-data))
 
-(define-route planet-main (""
-                           :render-method #'(lambda (data) (funcall *template* data)))
+(restas:define-route planet-main (""
+                                  :render-method #'(lambda (data) (funcall *template* data)))
   (prepare-planet-data))
 
