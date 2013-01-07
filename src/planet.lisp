@@ -70,17 +70,17 @@
   (list :entry-list (spider-syndicate-feed *spider*)
         :authors (spider-feeds-authors *spider*)
         :css (list (restas:genurl 'planet-resources :file "planet.css"))
-        :href-atom (restas:gen-full-url 'planet-atom)
-        :href-html (restas:gen-full-url 'planet-main)
+        :href-atom (restas:genurl* 'planet-atom)
+        :href-html (restas:genurl* 'planet-main)
         :name *name*
         :suggest-mail *suggest-mail*))
 
-(restas:define-route planet-atom ("atom.xml"
-                                  :content-type "application/atom+xml"
-                                  :render-method 'restas.planet.view:atom-feed)
+(restas:define-route planet-atom ("atom.xml")
+  (:content-type "application/atom+xml")
+  (:render-method 'restas.planet.view:atom-feed)
   (prepare-planet-data))
 
-(restas:define-route planet-main (""
-                                  :render-method #'(lambda (data) (funcall *template* data)))
+(restas:define-route planet-main ("")
+  (:render-method #'(lambda (data) (funcall *template* data)))
   (prepare-planet-data))
 
